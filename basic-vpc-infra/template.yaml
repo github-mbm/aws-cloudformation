@@ -1,0 +1,160 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Basic VPC Infrastructure
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: VPC Settings
+        Parameters:
+          - Vpcname
+          - VpcCIDR
+          - PublicSubnetCIDR
+    ParameterLabels:
+      Vpcname:
+        default: Enter VPC NAME 
+      VpcCIDR:
+        default: Enter VPC CIDR
+      PublicSubnetCIDR:
+        default: Enter PublicSubnetCIDR
+
+Parameters:
+  Vpcname:
+    Type: String
+  VpcCIDR:
+    Type: String
+  PublicSubnetCIDR:
+    Type: String
+
+Mappings:
+  RegionToAMI:
+    us-east-1:
+      AMI: ami-0a59ec92177ec3fad
+      #AMI1:
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      CidrBlock: !Ref VpcCIDR
+      Tags:
+        - Key: Name
+          Value: !Ref Vpcname
+        - Key: CloudFormationStack
+          Value: test_cf_stack
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties: 
+      Tags:
+        - Key: Name
+          Value: !Sub '${Vpcname}-igw' # Substitute variables inside string
+        - Key: CloudFormationStack
+          Value: test_cf_stack
+
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway  # Take the value/output of the resource named VPC and use it here
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PublicSubnetCIDR
+      AvailabilityZone: us-east-1a
+      MapPublicIpOnLaunch: true
+      Tags: 
+        - Key: Name
+          Value: !Sub '${Vpcname}-pubsubnet-1'
+        - Key: CloudFormationStack
+          Value: test_cf_stack
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${Vpcname}-rt'
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref PublicSubnet
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VPC
+      GroupDescription: Allow SSH and HTTP
+      GroupName: sandbox-sg
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub '${Vpcname}-sg'
+
+  LinuxServer:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: us-east-1a
+      ImageId: !FindInMap [RegionToAMI, !Ref AWS::Region, AMI] # !FindInMap is used to fetch/get a value from Mappings
+      InstanceType: t2.micro
+      KeyName: laptopkey
+      SecurityGroupIds:
+        - !Ref SecurityGroup
+      SubnetId: !Ref PublicSubnet
+      UserData:
+        Fn::Base64: |  # Encode this script before passing it to EC2
+           #!/bin/bash
+           yum update -y 
+           yum install nginx -y
+           systemctl start nginx
+      Tags:
+        - Key: Name
+          Value: !Sub '${Vpcname}-server-1'
+Outputs:
+  VpcID:
+    Description: The vpcID
+    Value: !Ref VPC
+  EC2PubIP:
+    Description: Instance Public Ip
+    Value: !GetAtt LinuxServer.PublicIp  #!GetAtt is used only when you need some other detail/attribute   
+          
+    
+
+    
+
+
+
+
+    
+  
+
+  
+      
+
+
