@@ -1,0 +1,66 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Parent Stack
+
+Parameters:
+
+  Vpcname:
+    Type: String
+
+  VpcCIDR:
+    Type: String
+
+  PublicSubnetCIDR:
+    Type: String
+
+  Environment:
+    Type: String
+    AllowedValues:
+      - dev
+      - prod
+  
+
+Resources:
+
+  NetworkStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://nix-awsbucket.s3.us-east-1.amazonaws.com/network/network.yaml
+      Parameters:
+        Vpcname: !Ref Vpcname
+        VpcCIDR: !Ref VpcCIDR
+        PublicSubnetCIDR: !Ref PublicSubnetCIDR
+  
+  SecurityStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://nix-awsbucket.s3.us-east-1.amazonaws.com/security/Security.yaml
+
+      Parameters:
+        VPCID: !GetAtt NetworkStack.Outputs.VPCID 
+
+
+  EC2Stack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://nix-awsbucket.s3.us-east-1.amazonaws.com/compute/ec2.yaml
+      Parameters:
+        PublicSubnetID: !GetAtt NetworkStack.Outputs.PublicSubnetID
+        SecurityGroupID: !GetAtt SecurityStack.Outputs.SecurityGroupID
+
+Outputs:
+
+  VPCID:
+    Description: VPC ID
+    Value: !GetAtt NetworkStack.Outputs.VPCID
+
+  PublicSubnetID:
+    Description: Subnet ID
+    Value: !GetAtt NetworkStack.Outputs.PublicSubnetID
+
+  InstanceID:
+    Description: EC2 Instance ID
+    Value: !GetAtt EC2Stack.Outputs.InstanceID
+    
+  SecurityGroupID:
+    Description: SecurityGroup ID
+    Value: !GetAtt SecurityStack.Outputs.SecurityGroupID    

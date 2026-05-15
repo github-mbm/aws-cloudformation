@@ -1,0 +1,53 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Server configuration
+      
+Parameters:
+  PublicSubnetID:
+    Type: String
+
+  SecurityGroupID:
+    Type: String
+
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - prod
+
+Conditions:
+  IsProd: !Equals [!Ref Environment, prod]
+
+Mappings:
+  RegionToAMI:
+    us-east-1:
+      AMI: ami-0a59ec92177ec3fad
+      #AMI1:
+
+Resources:
+LinuxServer:
+    Type: AWS::EC2::Instance
+    Condition: IsProd
+    Properties:
+      AvailabilityZone: us-east-1a
+      ImageId: !FindInMap [RegionToAMI, !Ref AWS::Region, AMI] # !FindInMap is used to fetch/get a value from Mappings
+      InstanceType: t2.micro
+      KeyName: laptopkey
+      SecurityGroupIds:
+        - !Ref SecurityGroup
+      SubnetId: !Ref PublicSubnet
+      UserData:
+        Fn::Base64: |  # Encode this script before passing it to EC2
+           #!/bin/bash
+           yum update -y 
+           yum install nginx -y
+           systemctl start nginx
+      Tags:
+        - Key: Name
+          Value: !Sub '${Vpcname}-server-1'
+
+Outputs:
+
+  VPCID:
+    Description: InstanceId
+    Value: !Ref LinuxServer

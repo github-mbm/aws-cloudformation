@@ -1,0 +1,100 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Network configuration
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: VPC Settings
+        Parameters:
+          - Vpcname
+          - VpcCIDR
+          - PublicSubnetCIDR
+
+    ParameterLabels:
+      Vpcname:
+        default: Enter VPC NAME 
+      VpcCIDR:
+        default: Enter VPC CIDR
+      PublicSubnetCIDR:
+        default: Enter PublicSubnetCIDR
+      
+Parameters:
+  Vpcname:
+    Type: String
+  VpcCIDR:
+    Type: String
+  PublicSubnetCIDR:
+    Type: String
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      CidrBlock: !Ref VpcCIDR
+      Tags:
+        - Key: Name
+          Value: !Ref Vpcname
+        - Key: CloudFormationStack
+          Value: test_cf_stack
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties: 
+      Tags:
+        - Key: Name
+          Value: !Sub '${Vpcname}-igw' # Substitute variables inside string
+        - Key: CloudFormationStack
+          Value: test_cf_stack
+
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway  # Take the value/output of the resource named VPC and use it here
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PublicSubnetCIDR
+      AvailabilityZone: us-east-1a
+      MapPublicIpOnLaunch: true
+      Tags: 
+        - Key: Name
+          Value: !Sub '${Vpcname}-pubsubnet-1'
+        - Key: CloudFormationStack
+          Value: test_cf_stack
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${Vpcname}-rt'
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref PublicSubnet
+
+Outputs:
+
+  VPCID:
+    Description: VPC ID
+    Value: !Ref VPC
+
+  PublicSubnetID:
+    Description: Public Subnet ID
+    Value: !Ref PublicSubnet
