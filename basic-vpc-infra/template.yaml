@@ -9,6 +9,7 @@ Metadata:
           - Vpcname
           - VpcCIDR
           - PublicSubnetCIDR
+
     ParameterLabels:
       Vpcname:
         default: Enter VPC NAME 
@@ -16,7 +17,7 @@ Metadata:
         default: Enter VPC CIDR
       PublicSubnetCIDR:
         default: Enter PublicSubnetCIDR
-
+      
 Parameters:
   Vpcname:
     Type: String
@@ -24,6 +25,13 @@ Parameters:
     Type: String
   PublicSubnetCIDR:
     Type: String
+  Environment:
+    Type: String
+    AllowedValues:
+      - dev
+      - prod
+Conditions:
+  IsProd: !Equals [!Ref Environment, prod]
 
 Mappings:
   RegionToAMI:
@@ -119,6 +127,7 @@ Resources:
 
   LinuxServer:
     Type: AWS::EC2::Instance
+    Condition: IsProd
     Properties:
       AvailabilityZone: us-east-1a
       ImageId: !FindInMap [RegionToAMI, !Ref AWS::Region, AMI] # !FindInMap is used to fetch/get a value from Mappings
@@ -141,6 +150,7 @@ Outputs:
     Description: The vpcID
     Value: !Ref VPC
   EC2PubIP:
+    Condition: IsProd
     Description: Instance Public Ip
     Value: !GetAtt LinuxServer.PublicIp  #!GetAtt is used only when you need some other detail/attribute   
           
